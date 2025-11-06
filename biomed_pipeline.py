@@ -10,7 +10,7 @@ from spacy.language import Language
 # Optional data directory with CSVs. If missing, we fall back to built-in seeds.
 DATA_DIR = Path(__file__).parent / "data"
 
-# ---------- CSV loaders (optional) ----------
+# ---------- CSV loaders (this is optional) ----------
 def _load_terms_one_col(path: Path, label: str) -> List[Dict[str, Any]]:
     patterns: List[Dict[str, Any]] = []
     if not path.exists():
@@ -67,12 +67,13 @@ def _seed_patterns() -> List[Dict[str, Any]]:
     return patterns
 
 def _load_all_patterns() -> List[Dict[str, Any]]:
-    # If CSVs exist, use them; otherwise fall back to built-in seeds.
-    csv_patterns: List[Dict[str, Any]] = []
-    csv_patterns += _load_terms_one_col(DATA_DIR / "drugs.csv", "DRUG")
-    csv_patterns += _load_terms_one_col(DATA_DIR / "diseases.csv", "DISEASE")
-    csv_patterns += _load_terms_labelled(DATA_DIR / "procedures_anatomy.csv")
-    return csv_patterns if csv_patterns else _seed_patterns()
+    # I start with built-in seeds
+    patterns: List[Dict[str, Any]] = _seed_patterns()
+    # Then we can add any CSV provided patterns (if files exist)
+    patterns += _load_terms_one_col(DATA_DIR / "drugs.csv", "DRUG")
+    patterns += _load_terms_one_col(DATA_DIR / "diseases.csv", "DISEASE")
+    patterns += _load_terms_labelled(DATA_DIR / "procedures_anatomy.csv")
+    return patterns
 
 # ---------- Pipeline ----------
 @functools.lru_cache(maxsize=1)
