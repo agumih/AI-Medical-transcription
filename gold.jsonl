@@ -1,0 +1,1 @@
+{"text":"The patient presented with hypertension and was prescribed lisinopril. MRI showed mild damage in the left ventricle. Aspirin recommended.","spans":[{"start":27,"end":39,"label":"DISEASE"},{"start":59,"end":69,"label":"DRUG"},{"start":71,"end":74,"label":"PROCEDURE"},{"start":101,"end":115,"label":"ANATOMY"},{"start":117,"end":124,"label":"DRUG"}]}
