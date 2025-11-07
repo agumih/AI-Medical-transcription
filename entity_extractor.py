@@ -1,22 +1,53 @@
-# entity_extractor.py
+# entity_extractor.py  (lazy-load scispaCy models)
 from __future__ import annotations
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import spacy
 
-# Load once; speeds up repeated runs.
-_NLP_EMB = spacy.load("en_core_sci_lg")                  # tokenizer + embeddings
-_NER_DISEASE_DRUG = spacy.load("en_ner_bc5cdr_md")       # DISEASE, CHEMICAL
-_NER_PROC_ANAT = spacy.load("en_ner_bionlp13cg_md")      # PROCEDURE-ish, ANATOMY-ish labels
+# --- Globals are set to None and filled only when actually used ---
+_NLP_EMB = None                # tokenizer + embeddings (en_core_sci_lg)
+_NER_DISEASE_DRUG = None       # en_ner_bc5cdr_md  (DISEASE, CHEMICAL)
+_NER_PROC_ANAT = None          # en_ner_bionlp13cg_md (PROCEDURE-ish, ANATOMY-ish)
+_WITH_LINKER = False           # becomes True if UMLS linker loads
 
-# Optional: UMLS linker for normalization (CUI)
-try:
-    from scispacy.linking import UmlsEntityLinker
-    _LINKER = UmlsEntityLinker(resolve_abbreviations=True, threshold=0.85)
-    _NLP_EMB.add_pipe(_LINKER)  # attaches as nlp.get_pipe("umls_linker")
-    _WITH_LINKER = True
-except Exception:
-    _WITH_LINKER = False
+_SCISPACY_LOAD_ERROR: Optional[str] = None
+
+
+def _ensure_models():
+    """
+    Load scispaCy models lazily. If any model is missing, raise a clear error
+    telling the user how to install them (or to stick to the rule-based module).
+    """
+    global _NLP_EMB, _NER_DISEASE_DRUG, _NER_PROC_ANAT, _WITH_LINKER, _SCISPACY_LOAD_ERROR
+    if _NLP_EMB is not None and _NER_DISEASE_DRUG is not None and _NER_PROC_ANAT is not None:
+        return
+
+    try:
+        _NLP_EMB = spacy.load("en_core_sci_lg")
+        _NER_DISEASE_DRUG = spacy.load("en_ner_bc5cdr_md")
+        _NER_PROC_ANAT = spacy.load("en_ner_bionlp13cg_md")
+    except Exception as e:
+        _SCISPACY_LOAD_ERROR = (
+            "scispaCy models are not installed. Either:\n"
+            "  • Use the rule-based extractor from biomed_pipeline.py (no extra installs), or\n"
+            "  • Install the optional models, e.g.:\n"
+            "      pip install scispacy\n"
+            "      pip install https://github.com/allenai/scispacy/releases/download/v0.5.4/en_core_sci_lg-0.5.4.tar.gz\n"
+            "      pip install https://github.com/allenai/scispacy/releases/download/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz\n"
+            "      pip install https://github.com/allenai/scispacy/releases/download/v0.5.4/en_ner_bionlp13cg_md-0.5.4.tar.gz\n"
+            f"\nOriginal error: {e!r}"
+        )
+        # I will leave globals as None so we can only raise on use.
+        raise RuntimeError(_SCISPACY_LOAD_ERROR) from e
+
+    try:
+        from scispacy.linking import UmlsEntityLinker
+        linker = UmlsEntityLinker(resolve_abbreviations=True, threshold=0.85)
+        _NLP_EMB.add_pipe(linker)  # attaches as nlp.get_pipe("umls_linker")
+        _WITH_LINKER = True
+    except Exception:
+        _WITH_LINKER = False  # perfectly fine I hope; linking remains off
+
 
 @dataclass
 class MedicalEntity:
@@ -32,23 +63,25 @@ class MedicalEntity:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+
 # Map model labels into a small, stable schema
 LABEL_MAP = {
     # bc5cdr
     "DISEASE": "DISEASE",
-    "CHEMICAL": "DRUG",                 # fold CHEMICAL → DRUG for our schema
+    "CHEMICAL": "DRUG",  # fold CHEMICAL → DRUG for our schema
     # bionlp13cg (subset)
     "ANATOMICAL_SITE": "ANATOMY",
     "TISSUE": "ANATOMY",
     "ORGAN": "ANATOMY",
     "CELL": "ANATOMY",
-    "AMINO_ACID": "CHEMICAL",           # we’ll treat CHEMICAL as DRUG later if needed
+    "AMINO_ACID": "CHEMICAL",      # we’ll treat CHEMICAL as DRUG later if needed
     "SIMPLE_CHEMICAL": "CHEMICAL",
-    "PROCESS": "PROCEDURE",             # heuristic
+    "PROCESS": "PROCEDURE",        # heuristic
     "MULTI-TISSUE_STRUCTURE": "ANATOMY",
     "ORGANISM_SUBDIVISION": "ANATOMY",
     "ORGANISM": "ANATOMY",
 }
+
 
 def _priority(e: MedicalEntity) -> Tuple[int, float, int]:
     """Prefer KB-linked, higher score, longer span for de-duplication."""
@@ -56,6 +89,7 @@ def _priority(e: MedicalEntity) -> Tuple[int, float, int]:
     kb_score = e.kb_score or 0.0
     length = e.end - e.start
     return (has_kb, kb_score, length)
+
 
 def _link_span(text: str, start: int, end: int) -> Tuple[str | None, str | None, float | None]:
     if not _WITH_LINKER:
@@ -70,13 +104,17 @@ def _link_span(text: str, start: int, end: int) -> Tuple[str | None, str | None,
     name = kb_ent.canonical_name if kb_ent else None
     return cui, name, float(score)
 
+
 class MedicalEntityExtractor:
-    """NER-only extraction (no classification, no error detection)."""
+    """scispaCy-based extractor. Only used if your environment has the optional models installed."""
 
     def __init__(self, do_linking: bool = True):
-        self.do_linking = do_linking and _WITH_LINKER
+        self.do_linking = do_linking  # will be ANDed with _WITH_LINKER after models load
 
     def extract(self, text: str) -> List[MedicalEntity]:
+        # Ensure models are present (or raise a clear error once)
+        _ensure_models()
+
         raw: List[MedicalEntity] = []
 
         doc1 = _NER_DISEASE_DRUG(text)
@@ -89,7 +127,7 @@ class MedicalEntityExtractor:
                     continue
                 kb_id = kb_name = None
                 kb_score = None
-                if self.do_linking:
+                if self.do_linking and _WITH_LINKER:
                     kb_id, kb_name, kb_score = _link_span(text, ent.start_char, ent.end_char)
                 # Normalize CHEMICAL → DRUG in final output
                 final_label = "DRUG" if mapped == "CHEMICAL" else mapped
@@ -117,5 +155,15 @@ class MedicalEntityExtractor:
 
         return merged
 
+
 def extract_entities(text: str, link: bool = True) -> List[Dict[str, Any]]:
-    return [e.to_dict() for e in MedicalEntityExtractor(do_linking=link).extract(text)]
+    """
+    Public API for scispaCy extractor.
+    If models are missing, raise a friendly error telling the user what to do.
+    """
+    try:
+        extractor = MedicalEntityExtractor(do_linking=link)
+        return [e.to_dict() for e in extractor.extract(text)]
+    except RuntimeError as e:
+        # Re-raise with the helpful message from _ensure_models()
+        raise
