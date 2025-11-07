@@ -1,5 +1,6 @@
+```text
 spacy>=3.8,<3.9
-# Optional:
+# Optional (only if you guys plan to use scispaCy):
 # scispacy
 # https://github.com/allenai/scispacy/releases/download/v0.5.4/en_core_sci_lg-0.5.4.tar.gz
 # https://github.com/allenai/scispacy/releases/download/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
