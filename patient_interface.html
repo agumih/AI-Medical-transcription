@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Patient Medical Transcriptione</title>
+    <link rel="stylesheet" href="patient_interface.css">
+</head>
+
+<body>
+    <button class="back-button" onclick="window.location.href='gui.html'">← Back</button>
+
+    <div class="container">
+        <div class="input">
+            <h2>Input</h2>
+            <div class="button-group">
+                <input 
+                    type="file" 
+                    id="fileInput" 
+                    accept=".txt" 
+                    style="display:none" 
+                    onchange="handleFileUpload(event)">
+                <button onclick="document.getElementById('fileInput').click()">Upload File</button>
+                <button onclick="downloadInput()">Download Input</button>
+            </div>
+
+            <textarea id="input" placeholder="enter text..."></textarea>
+            <button onclick="processText()">Process Text</button>
+        </div>
+
+        <div class="output">
+            <h2>Output</h2>
+            <div class="button-group">
+                <button onclick="downloadOutput()">Download Output</button>
+            </div>
+            <div id="output">Output...</div>
+        </div>
+    </div>
+
+    <script>
+        function processText() {
+            let inputText = document.getElementById('input').value;
+            let out = document.getElementById('output');
+            out.innerHTML = `<p>${inputText}</p>`;
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                document.getElementById('input').value = ev.target.result;
+            };
+            reader.readAsText(file);
+        }
+
+        function downloadInput() {
+            const val = document.getElementById('input').value;
+            if (!val.trim()) {
+                alert('Input is empty!');
+                return;
+            }
+            saveToFile('input.txt', val);
+        }
+
+        function downloadOutput() {
+            const txt = document.getElementById('output').innerText;
+            if (!txt || txt === 'Output...') {
+                alert('No output to download');
+                return;
+            }
+            saveToFile('output.txt', txt);
+        }
+
+        function saveToFile(filename, content) {
+            const a = document.createElement('a');
+            a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>
