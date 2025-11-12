@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    
+    <title>Transcription</title>
+    <link rel="stylesheet" href="gui.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar__container">
+            <a href="#" id="navbar__logo">AI Transcription</a>
+            <ul class="navbar__menu">
+                <li class="navbar__item">
+                    <input 
+                        type="text" 
+                        class="navbar__input" 
+                        id="patientId" 
+                        placeholder="Enter Patient Number..."
+                    >
+                    <button 
+                        class="navbar__button" 
+                        onclick="searchPatient()"
+                    >Search</button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="content">
+        <h1 class="content__title">Welcome to AI Medical Transcription</h1>
+        <p class="content__text">Ai...</p>
+    </div>
+
+    <script>
+        function searchPatient() {
+            const inputEl = document.getElementById('patientId');
+            const patientId = inputEl ? inputEl.value.trim() : '';
+
+            if (!patientId) {
+                alert('Please enter a patient number first!');
+                return;
+            }
+
+            window.location.href = "patient_interface.html?id=" + encodeURIComponent(patientId);
+        }
+
+        document.getElementById('patientId')?.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                searchPatient();
+            }
+        });
+    </script>
+</body>
+</html>
