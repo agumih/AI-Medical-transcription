@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
-from classification import build_pipeline
+from utils import build_pipeline
 
 def load_mtsamples():
     """
