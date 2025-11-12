@@ -1,4 +1,4 @@
-```text
+text
 spacy>=3.8,<3.9
 # Optional (only if you guys plan to use scispaCy):
 # scispacy
